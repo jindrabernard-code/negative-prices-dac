@@ -7,7 +7,7 @@ Self-contained thesis folder. Everything needed to reproduce and extend the anal
 | File | Description |
 |---|---|
 | `thesis_draft_full.md` / `.docx` | **The current complete draft (ch. 1–9)** — merged from the ch. 1–4 text and the results chapters, with embedded figures. **Not published to the public GitHub repository** (excluded via `.gitignore`); it stays local only. |
-| `instrukce_projekt_rezimy_dac_lcoc.md` | Project charter / truth source (topic, RQs, methodology, scope control) |
+| `instrukce_projekt_rezimy_dac_lcoc.md` | Project charter / truth source (topic, RQs, methodology, scope control). **Not published to the public GitHub repository** (excluded via `.gitignore`); it stays local only. |
 
 Earlier partial/superseded draft versions (`thesis_draft_ch1-4.*`, `archive/thesis_draft.*`) have been removed; this is the only draft kept going forward.
 
