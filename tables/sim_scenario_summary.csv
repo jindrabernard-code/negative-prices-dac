@@ -1,0 +1,6 @@
+scenario,solar_factor,mean_residual_load_mw,share_hours_resload_lt_min,surplus_regime_share,expected_surplus_hours_per_year,negative_price_share,expected_negative_hours_per_year,mean_price
+today,1.0,6974.4657,0.0,0.2212,1942.47,0.0341,299.53,85.3769
+necp_2030_low,1.6,6707.3,0.0207,0.2313,2030.905,0.0354,310.915,84.918
+necp_2030_central,2.1,6484.6619,0.0634,0.2566,2253.56,0.0399,350.735,83.4256
+necp_2030_high,2.6,6262.0238,0.1078,0.2861,2512.785,0.0446,391.56,81.5374
+necp_2035_central,3.0,6083.9133,0.1371,0.3137,2755.24,0.0486,426.525,79.7338

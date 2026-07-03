@@ -1,0 +1,17 @@
+# Thesis draft text is intentionally excluded from this repository.
+thesis_draft_full.md
+thesis_draft_full.docx
+thesis_draft*.md
+thesis_draft*.docx
+
+# Environment / secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# OS junk
+.DS_Store
+Thumbs.db

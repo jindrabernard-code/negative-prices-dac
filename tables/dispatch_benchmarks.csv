@@ -1,0 +1,16 @@
+scenario,policy,CF_mean,CF_p05,CF_p95,mean_el_price_paid,profit_mean_keur
+today,threshold,0.2457,0.2273,0.2681,28.1587,643.9693
+today,optimal_minrun,0.2446,0.2253,0.2683,29.7344,607.2268
+today,baseload,1.0,1.0,1.0,85.3768,-2404.2349
+necp_2030_low,threshold,0.2511,0.2277,0.2734,27.8809,664.0828
+necp_2030_low,optimal_minrun,0.2502,0.2249,0.273,29.4792,626.7083
+necp_2030_low,baseload,1.0,1.0,1.0,84.918,-2363.9375
+necp_2030_central,threshold,0.2661,0.2416,0.2897,27.047,723.2362
+necp_2030_central,optimal_minrun,0.2658,0.2425,0.2897,28.6702,684.7251
+necp_2030_central,baseload,1.0,1.0,1.0,83.4256,-2232.8738
+necp_2030_high,threshold,0.2834,0.2618,0.3061,26.3143,788.566
+necp_2030_high,optimal_minrun,0.2838,0.2634,0.307,27.9844,748.095
+necp_2030_high,baseload,1.0,1.0,1.0,81.5374,-2067.058
+necp_2035_central,threshold,0.2998,0.2772,0.3216,25.7532,849.0272
+necp_2035_central,optimal_minrun,0.3009,0.2754,0.3251,27.4566,807.0623
+necp_2035_central,baseload,1.0,1.0,1.0,79.7338,-1908.6628

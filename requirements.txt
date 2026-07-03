@@ -1,0 +1,36 @@
+# Battery Arbitrage — Thesis Topic 1
+# Data collection dependencies
+#
+# Install with:  pip install -r requirements.txt
+
+# ── Core data & numerics ──────────────────────────────────────────────────────
+pandas>=2.0
+numpy>=1.26
+requests>=2.31
+
+# ── ENTSO-E Transparency Platform ─────────────────────────────────────────────
+entsoe-py>=0.6
+
+# ── Environment / secrets ─────────────────────────────────────────────────────
+python-dotenv>=1.0
+
+# ── ERA5 / Copernicus CDS ─────────────────────────────────────────────────────
+cdsapi>=0.7.2   # new CDS API (2024+); older versions reject the token format
+
+# ── OTE XLS parsing ───────────────────────────────────────────────────────────
+openpyxl>=3.1    # required by pandas to read .xls/.xlsx files
+xlrd>=2.0        # legacy .xls format support
+
+# ── ERA5 NetCDF → CSV conversion (optional) ───────────────────────────────────
+xarray>=2024.1
+netCDF4>=1.6
+scipy>=1.12      # needed by xarray for some interpolations
+
+# ── Analysis pipeline (analysis/run_all.py) ───────────────────────────────────
+statsmodels>=0.14   # logit baseline + homogeneous Markov-switching
+matplotlib>=3.8     # descriptive and diagnostic figures
+
+# ── Optional: modelling stack ─────────────────────────────────────────────────
+# pyomo>=6.7
+# highspy>=1.5     # HiGHS solver (free; not needed — dispatch solved by exact DP)
+# arch>=6.3        # ARMA-GARCH for scenario generation
