@@ -1,11 +1,11 @@
 """
-build_panel.py  —  Topic 1: Battery Storage Arbitrage
-======================================================
+build_panel.py  —  Czech electricity market panel builder
+=========================================================
 Merges all collected data sources into a single wide-format hourly panel CSV.
 
 Output
 ------
-  data/topic1_panel.csv
+  data/cz_power_panel.csv
   Index : datetime (UTC, hourly)
   Columns (see DATA_LEGEND.md for full descriptions):
 
@@ -48,7 +48,7 @@ logging.basicConfig(level=logging.INFO,
 log = logging.getLogger(__name__)
 
 DATA_DIR  = Path(__file__).parent / "data"
-OUT_FILE  = DATA_DIR / "topic1_panel.csv"
+OUT_FILE  = DATA_DIR / "cz_power_panel.csv"
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -234,7 +234,7 @@ def load_era5() -> pd.DataFrame:
 def build_panel() -> None:
     sep = "═" * 60
     log.info(sep)
-    log.info("Topic 1 — Building Hourly Panel Dataset")
+    log.info("Building Czech electricity market hourly panel")
     log.info(sep)
 
     ote    = load_ote()
@@ -254,7 +254,7 @@ def build_panel() -> None:
 
     panel = panel.sort_index()
 
-    # Trim to 2020-01-01 – 2024-12-31 (Topic 1 scope)
+    # Trim to the common 2020-01-01 – 2024-12-31 window
     panel = panel.loc["2020-01-01":"2024-12-31"]
 
     # Drop rows that are entirely NaN

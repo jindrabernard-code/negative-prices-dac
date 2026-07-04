@@ -1,11 +1,11 @@
 """
-run_all.py — orchestrator for the thesis analysis pipeline.
+run_all.py — orchestrator for the analysis pipeline.
 
 Runs the sub-scripts in dependency order:
 
   s0_data_prep         panel -> prepared dataset (residual load, surplus flag,
                        deseasonalised price, grid intensity)
-  s1_descriptives      tables + figures for thesis §3.4
+  s1_descriptives      tables + figures for draft §3.4
   s2_logit_baseline    logit safety net (§4.1.1)
   s3_markov_switching  homogeneous MS + TVTP estimation (§4.1.2)   [slowest]
   s4_simulation        price-path simulation + RQ2 scenarios (§4.1.3, §4.2.3)

@@ -1,6 +1,6 @@
 """
 s4_simulation.py — price-path simulation from the estimated TVTP model
-(thesis §4.2.3) and scenario projection of the surplus regime (§4.1.3, RQ2).
+(draft §4.2.3) and scenario projection of the surplus regime (§4.1.3, RQ2).
 
 Design:
   * base year = last full calendar year of the estimation sample (2024):

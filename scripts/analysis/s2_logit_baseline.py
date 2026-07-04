@@ -1,5 +1,5 @@
 """
-s2_logit_baseline.py — baseline binary response model (thesis §4.1.1).
+s2_logit_baseline.py — baseline binary response model (draft §4.1.1).
 
 Logit of the surplus-hour indicator on residual load + calendar controls:
 

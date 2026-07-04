@@ -1,5 +1,5 @@
 """
-s0_data_prep.py — data preparation (thesis §3.2–3.3).
+s0_data_prep.py — data preparation (draft §3.2–3.3).
 
 Loads the merged hourly panel, constructs the variables used by all later
 layers, and writes a single prepared dataset:

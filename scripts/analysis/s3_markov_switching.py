@@ -1,6 +1,6 @@
 """
 s3_markov_switching.py — Markov-switching models of the deseasonalised price
-(thesis §4.1.2).
+(draft §4.1.2).
 
 Two estimators:
 

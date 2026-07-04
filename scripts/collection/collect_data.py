@@ -2,8 +2,8 @@
 """
 collect_data.py
 ===============
-Data Collection Script — Thesis Topic 1
-Stochastic Optimization of Battery Storage Arbitrage, Czech Electricity Market
+Data collection script for the Czech electricity market dataset.
+Downloads and stores the raw sources that feed the merged hourly panel.
 
 Data sources
 ------------
@@ -323,7 +323,7 @@ def collect_ceps(out_dir: Path) -> None:
     Download data from ČEPS (ČEPS, a.s. — Czech TSO).
     Website: https://www.ceps.cz/en/all-data
 
-    ČEPS provides the following datasets relevant to battery arbitrage:
+    ČEPS provides the following datasets used in the panel:
 
     Dataset                     Description
     ─────────────────────────── ─────────────────────────────────────────────
@@ -648,7 +648,7 @@ def era5_nc_to_csv(era5_dir: Path, out_dir: Path) -> None:
 def main() -> None:
     sep = "═" * 60
     log.info(sep)
-    log.info("Battery Arbitrage — Data Collection Script")
+    log.info("Czech electricity market — data collection")
     log.info(f"Period  : {START_DATE.date()}  →  {END_DATE.date()}")
     log.info(f"Output  : {DATA_DIR.resolve()}")
     log.info(sep)

@@ -1,8 +1,8 @@
 """
-s1_descriptives.py — descriptive analysis (thesis §3.4).
+s1_descriptives.py — descriptive analysis (draft §3.4).
 
-Produces the tables and figures that document the two facts motivating the
-thesis: (i) the 2021–2023 crisis structural break, (ii) the acceleration of
+Produces the tables and figures that document the two motivating facts:
+(i) the 2021–2023 crisis structural break, (ii) the acceleration of
 negative-price hours in lockstep with solar build-out.
 
 Outputs (analysis/output/):

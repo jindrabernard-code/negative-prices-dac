@@ -1,3 +1,12 @@
+# Draft text is intentionally excluded from this repository.
+thesis_draft_full.md
+thesis_draft_full.docx
+thesis_draft*.md
+thesis_draft*.docx
+
+# Internal project charter is intentionally excluded from this repository.
+instrukce_projekt_rezimy_dac_lcoc.md
+
 # Environment / secrets
 .env
 
@@ -9,3 +18,6 @@ __pycache__/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Local commit-message scratch
+.commit_msg.txt

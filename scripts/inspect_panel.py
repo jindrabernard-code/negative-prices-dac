@@ -1,10 +1,13 @@
-"""Quick inspection of topic1_panel.csv for the thesis data section."""
+"""Quick descriptive inspection of the merged hourly panel (cz_power_panel.csv)."""
+from pathlib import Path
+
 import pandas as pd
 
 pd.set_option("display.width", 200)
 pd.set_option("display.max_columns", 100)
 
-df = pd.read_csv("topic1_battery_arbitrage/data/topic1_panel.csv", index_col=0, parse_dates=True)
+PANEL_CSV = Path(__file__).resolve().parents[1] / "data" / "cz_power_panel.csv"
+df = pd.read_csv(PANEL_CSV, index_col=0, parse_dates=True)
 
 print("SHAPE:", df.shape)
 print("RANGE:", df.index.min(), "->", df.index.max())

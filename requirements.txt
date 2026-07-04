@@ -1,5 +1,5 @@
-# Battery Arbitrage — Thesis Topic 1
-# Data collection dependencies
+# Czech electricity market × flexible DAC — Python dependencies
+# Data collection + analysis pipeline
 #
 # Install with:  pip install -r requirements.txt
 

@@ -1,6 +1,6 @@
 """
 s6_economics.py — economic evaluation: LCOC, break-even credit price and the
-LCOC × net-removal trade-off curve (thesis §4.3).
+LCOC × net-removal trade-off curve (draft §4.3).
 
   LCOC = (CAPEX·CRF + FOM + C_el + C_heat) / Q,   Q = CF·T·P/e  (endogenous)
   CRF  = r(1+r)^n / ((1+r)^n − 1)
@@ -13,7 +13,7 @@ LCOC × net-removal trade-off curve (thesis §4.3).
   Q_net = Q − Σ_t u_t (P·ε_t^grid + (P·h/e)·ε_heat),
   ε_t^grid = hourly generation-weighted CZ intensity of the base year.
   (Scenario limitation: historical intensity profile is retained across PV
-  scenarios; flagged in the thesis limitations.)
+  scenarios; flagged in the draft limitations.)
 
 Uses the threshold policy (exactly optimal without min-run constraints; s5
 quantifies the min-run gap separately).

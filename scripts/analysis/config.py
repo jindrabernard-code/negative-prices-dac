@@ -1,15 +1,16 @@
 """
-config.py — central configuration for the thesis analysis pipeline.
+config.py — central configuration for the analysis pipeline.
 
 All tunable parameters live here so that individual sub-scripts stay free of
-magic numbers. Values marked VERIFY are working assumptions that must be
-justified (and possibly updated) in the thesis text before submission.
+magic numbers. Values marked VERIFY are working assumptions that are
+justified (and possibly updated) in the accompanying draft.
 """
 from pathlib import Path
 
 # ── paths ─────────────────────────────────────────────────────────────────────
-ROOT = Path(__file__).resolve().parents[1]
-PANEL_CSV = ROOT / "topic1_battery_arbitrage" / "data" / "topic1_panel.csv"
+# ROOT is the repository root (the folder that contains data/, scripts/, ...).
+ROOT = Path(__file__).resolve().parents[2]
+PANEL_CSV = ROOT / "data" / "cz_power_panel.csv"
 
 OUT_DIR = Path(__file__).resolve().parent / "output"
 TAB_DIR = OUT_DIR / "tables"

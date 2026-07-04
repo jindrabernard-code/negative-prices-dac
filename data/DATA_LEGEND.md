@@ -1,264 +1,231 @@
-# Data Legend — Battery Arbitrage Thesis
+# Data Legend — Czech Electricity Market Hourly Panel
 
-All data covers the Czech Republic for the period **2020-01-01 → 2024-12-31** (5 years, hourly resolution unless noted).
+Variable-level documentation for the merged dataset of the Czech power market and
+associated weather, covering **2020-01-01 → 2024-12-31** at **hourly resolution**.
 
----
+The repository ships a single compiled artifact:
 
-## 1. OTE — Day-ahead Market Prices
-
-| Property | Value |
-|---|---|
-| **File** | `data/ote/cz_dam_ote.csv` |
-| **Source** | OTE, a.s. (Czech electricity market operator) |
-| **URL** | https://www.ote-cr.cz |
-| **Download method** | Daily XLS reports, URL pattern: `/pubweb/attachments/01/{year}/month{MM}/day{DD}/DT_{DD}_{MM}_{YYYY}_CZ.xls` |
-| **Time span** | 2020-01-01 00:00 → 2024-12-31 23:00 |
-| **Resolution** | 1 hour |
-| **Rows** | 43,843 |
-| **Missing** | 5 hours (DST spring-forward transitions — no market hour exists) |
-| **Index** | `datetime` — naive **CET/CEST local time** (not tz-aware). `build_panel.py` localizes it to Europe/Prague and converts to UTC when building the panel; DST fall-back duplicate hours are dropped as ambiguous. |
-
-### Columns
-
-| Column | Unit | Description | Range |
+| File | Rows | Columns | Index |
 |---|---|---|---|
-| `price_eur_mwh` | EUR/MWh | Day-ahead clearing price on the Czech DAM | −138.8 to +871.0, mean 113.5 |
-| `volume_mwh` | MWh | Total traded volume in that hour | 762.6 to 5,447.8, mean 2,799 |
+| `cz_power_panel.csv` | 43,848 | 51 | `datetime` — **naive UTC**, hourly, continuous (no gaps) |
 
-**Notes:**
-- Negative prices occur during periods of excess renewable generation.
-- The 871 EUR/MWh peak corresponds to the 2021/2022 energy crisis.
-- OTE restructured their XLS format in mid-2024 (data table moved further down the sheet); the parser handles both formats automatically.
+The raw per-source files (`ote/`, `entsoe/`, `ceps/`, `era5/`) are *not* shipped;
+they are re-created locally by `scripts/collection/collect_data.py` and merged into
+the panel by `scripts/collection/build_panel.py`. Sections 1–5 below document the
+compiled panel column by column; Section 6 documents the upstream sources and how
+they are integrated; Section 7 documents the processing pipeline; Section 8 collects
+conventions, caveats and known issues.
 
 ---
 
-## 2. ČEPS — Imbalance Price
+## Conventions
 
-| Property | Value |
+| Aspect | Convention |
 |---|---|
-| **File** | `data/ceps/cz_imbalance_price.csv` |
-| **Source** | ČEPS, a.s. (Czech transmission system operator) |
-| **URL** | https://www.ceps.cz/en/all-data → endpoint `/downloads/graph` |
-| **Download method** | GET request: `method=OdhadovanaCenaOdchylky&format=csv&agregation=QH` |
-| **Time span** | 2020-01-01 00:00 → 2025-01-01 00:45 |
-| **Resolution** | 15 minutes |
-| **Rows** | 57,059 |
+| **Time index** | Naive `datetime` interpreted as **UTC**. Local Czech time is CET (UTC+1) / CEST (UTC+2). |
+| **Resolution** | Hourly. Sources delivered at 15-minute resolution are aggregated to hourly means (see §7). |
+| **Coverage** | 2020-01-01 00:00 → 2024-12-31 23:00 UTC, a continuous 43,848-hour index. |
+| **Currency** | Prices in EUR/MWh, except the ČEPS imbalance price which is native CZK/MWh. |
+| **Power units** | MW (average power over the hour). |
+| **Cross-border sign** | **Positive = export from CZ**, negative = import to CZ. |
+| **Missing values** | Empty cells. Missing shares per column are listed in the tables below; all are < 1 %. |
+| **Column names** | `source_category_detail` in snake_case; original Czech generation labels are kept as suffixes (e.g. `_fve_mw`) and translated in the notes. |
 
-### Columns
+---
 
-| Column | Unit | Description | Range |
+## 1. Prices
+
+| Column | Unit | Source | Missing | Min | Max | Mean | Description |
+|---|---|---|---|---|---|---|---|
+| `ote_price_eur_mwh` | EUR/MWh | OTE | 0.04 % | −138.75 | 871.00 | 113.48 | Czech day-ahead market (DAM) clearing price. |
+| `volume_mwh` | MWh | OTE | 0.04 % | 762.60 | 5,447.80 | 2,798.62 | Total traded volume on the Czech DAM in that hour. |
+| `entsoe_cz_da_eur_mwh` | EUR/MWh | ENTSO-E | 0.00 % | −138.75 | 871.00 | 113.46 | Czech day-ahead price from ENTSO-E — an independent cross-check of the OTE series. |
+| `entsoe_de_da_eur_mwh` | EUR/MWh | ENTSO-E | 0.00 % | −500.00 | 936.28 | 107.23 | German (DE-LU) day-ahead price — the dominant price-coupling driver for CZ. |
+| `ceps_imbalance_odhadovaná_cena_kč_mwh` | CZK/MWh | ČEPS | 0.08 % | −664,968 | 213,623 | 2,084.23 | Estimated imbalance settlement price (positive = system short, negative = system long). |
+
+**Notes**
+- The OTE and ENTSO-E Czech day-ahead series are near-identical (same underlying market coupling); the tiny difference in missing share reflects OTE's few DST/report gaps that ENTSO-E fills. Keep both for validation, use one for modelling.
+- Negative day-ahead prices occur in hours of high renewable infeed and low demand; the 871 EUR/MWh maximum is the 2021–2022 energy-crisis peak.
+- The imbalance price is extremely heavy-tailed; the ±100,000+ CZK/MWh extremes are genuine scarcity/surplus settlement events, not parsing errors. Divide by the EUR/CZK rate (~25) for a rough EUR conversion.
+
+---
+
+## 2. Load
+
+| Column | Unit | Source | Missing | Min | Max | Mean | Description |
+|---|---|---|---|---|---|---|---|
+| `entsoe_load_Actual Load` | MW | ENTSO-E | 0.00 % | 3,849.61 | 11,281.13 | 7,234.23 | Actual total Czech system load (ENTSO-E metered). |
+| `ceps_load_zatížení_s_čerpáním_mw` | MW | ČEPS | 0.02 % | 4,224.17 | 12,132.82 | 8,014.62 | Total system load **including** pumped-storage pumping consumption. |
+| `ceps_load_zatížení_mw` | MW | ČEPS | 0.02 % | 4,224.17 | 12,132.82 | 7,854.57 | Net system load **excluding** pumped-storage pumping. |
+
+**Notes**
+- The column name `entsoe_load_Actual Load` retains ENTSO-E's original label (note the space and capitals); it is kept verbatim so the panel matches the raw download.
+- The two ČEPS load columns differ only by pumped-storage pumping; their gap is a proxy for pump-mode activity.
+- The ENTSO-E and ČEPS load levels differ by definition and metering boundary (ENTSO-E "Actual Load" vs ČEPS "Zatížení"); both are provided rather than reconciled.
+
+---
+
+## 3. Generation
+
+Two independent breakdowns of Czech generation are provided: the ENTSO-E
+production-type series (international, harmonised labels) and the ČEPS technology
+series (national operator, Czech labels). They cover the same physical fleet with
+minor definitional differences.
+
+### 3a. ENTSO-E generation per production type (MW, 0.00 % missing)
+
+| Column | Min | Max | Mean | Description |
+|---|---|---|---|---|
+| `entsoe_gen_nuclear` | 1,106.94 | 3,988.59 | 3,272.28 | Nuclear (Dukovany + Temelín) — near-baseload. |
+| `entsoe_gen_fossil_brown_coal_lignite` | 446.48 | 5,403.88 | 3,031.18 | Lignite/brown-coal thermal — the largest fossil block. |
+| `entsoe_gen_fossil_hard_coal` | 0.00 | 917.40 | 213.09 | Hard-coal thermal. |
+| `entsoe_gen_fossil_gas` | 70.31 | 1,515.25 | 535.74 | Natural-gas generation. |
+| `entsoe_gen_fossil_coal-derived_gas` | 0.00 | 389.71 | 107.78 | Coal-derived gas (blast-furnace/coke-oven gas). |
+| `entsoe_gen_fossil_oil` | 0.00 | 67.41 | 5.90 | Oil-fired generation (marginal). |
+| `entsoe_gen_solar` | 0.00 | 2,680.32 | 305.59 | Solar PV. |
+| `entsoe_gen_wind_onshore` | 1.26 | 295.55 | 76.23 | Onshore wind. |
+| `entsoe_gen_hydro_run-of-river_and_poundage` | 0.00 | 288.20 | 121.93 | Run-of-river hydro. |
+| `entsoe_gen_hydro_water_reservoir` | 0.00 | 784.32 | 139.92 | Reservoir hydro. |
+| `entsoe_gen_hydro_pumped_storage` | 0.00 | 1,089.83 | 123.69 | Pumped-storage generation (turbining only). |
+| `entsoe_gen_biomass` | 57.10 | 373.58 | 266.77 | Biomass. |
+| `entsoe_gen_waste` | 6.56 | 37.74 | 22.73 | Waste incineration. |
+| `entsoe_gen_other_renewable` | 211.43 | 309.44 | 270.28 | Other renewable. |
+| `entsoe_gen_other` | 0.00 | 138.17 | 54.95 | Other/unclassified generation. |
+
+### 3b. ČEPS generation mix (MW, 0.02 % missing)
+
+| Column | Czech term | Min | Max | Mean | Description |
+|---|---|---|---|---|---|
+| `ceps_gen_je_mw` | jaderná elektrárna | 1,170.70 | 4,221.10 | 3,461.90 | Nuclear. |
+| `ceps_gen_pe_mw` | parní elektrárna | 733.80 | 7,164.60 | 4,009.18 | Thermal (coal/gas/oil steam plants). |
+| `ceps_gen_ppe_mw` | paroplynová/průmyslová | −0.10 | 1,452.70 | 459.16 | Combined-cycle / industrial co-generation. |
+| `ceps_gen_ve_mw` | vodní elektrárna | −19.80 | 800.10 | 225.12 | Run-of-river hydro. |
+| `ceps_gen_pve_mw` | přečerpávací VE | −51.60 | 1,067.90 | 128.55 | Pumped-storage (positive = generating, negative = pumping). |
+| `ceps_gen_ae_mw` | alternativní | 156.00 | 386.00 | 242.50 | Alternative/auxiliary generation. |
+| `ceps_gen_ze_mw` | — | 0.00 | 0.00 | 0.00 | Reserved column — zero throughout the sample. |
+| `ceps_gen_vte_mw` | větrná turbína | 0.00 | 295.00 | 73.97 | Wind. |
+| `ceps_gen_fve_mw` | fotovoltaická el. | 0.00 | 3,181.80 | 308.25 | Solar PV. |
+
+### 3c. ČEPS renewable-only series (MW, 0.02 % missing)
+
+| Column | Min | Max | Mean | Description |
+|---|---|---|---|---|
+| `ceps_res_vte_mw` | 0.00 | 295.00 | 73.97 | Wind — standalone RES feed (duplicates `ceps_gen_vte_mw`). |
+| `ceps_res_fve_mw` | 0.00 | 3,181.80 | 308.29 | Solar PV — standalone RES feed (duplicates `ceps_gen_fve_mw`). |
+
+**Notes**
+- `ceps_res_*` columns are the same physical quantities as the corresponding `ceps_gen_*` columns, delivered by ČEPS as a separate renewable-only dataset; kept for traceability. Use one to avoid double counting.
+- Small negative minima in ČEPS hydro columns are genuine (auxiliary consumption / metering), not errors.
+- `ceps_gen_ze_mw` is identically zero over 2020–2024; kept to preserve the raw schema.
+- ENTSO-E and ČEPS solar peaks differ (~2,680 vs ~3,182 MW) because of differing metering scope and estimation methods for distributed PV — this is an expected source discrepancy, not an inconsistency.
+
+---
+
+## 4. Cross-border physical flows (ČEPS)
+
+All in MW, sign convention **positive = export from CZ**. Two variants per border:
+`skutečnost` = actual metered flow, `plán` = scheduled/planned flow.
+
+| Column | Counterpart TSO | Missing | Min | Max | Mean |
+|---|---|---|---|---|---|
+| `ceps_xborder_pse_skutečnost_mw` | PSE (Poland) | 0.02 % | −1,519.08 | 2,326.07 | 644.33 |
+| `ceps_xborder_pse_plán_mw` | PSE (Poland) | 0.62 % | −1,714.00 | 1,572.00 | −94.27 |
+| `ceps_xborder_seps_skutečnost_mw` | SEPS (Slovakia) | 0.02 % | −2,814.84 | 1,955.25 | −973.33 |
+| `ceps_xborder_seps_plán_mw` | SEPS (Slovakia) | 0.62 % | −2,200.10 | 1,316.60 | −787.26 |
+| `ceps_xborder_apg_skutečnost_mw` | APG (Austria) | 0.02 % | −3,069.08 | 1,025.17 | −1,032.54 |
+| `ceps_xborder_apg_plán_mw` | APG (Austria) | 0.62 % | −2,920.80 | 1,563.50 | −474.44 |
+| `ceps_xborder_tennet_skutečnost_mw` | TenneT (DE) | 0.02 % | −2,251.55 | 1,513.92 | −491.12 |
+| `ceps_xborder_tennet_plán_mw` | TenneT (DE) | 0.62 % | −1,750.00 | 1,750.00 | 119.69 |
+| `ceps_xborder_50hzt_skutečnost_mw` | 50Hertz (DE) | 0.02 % | −1,994.11 | 2,199.46 | 687.81 |
+| `ceps_xborder_50hzt_plán_mw` | 50Hertz (DE) | 0.62 % | −2,502.80 | 2,093.00 | 70.14 |
+| `ceps_xborder_ceps_skutečnost_mw` | ČEPS total | 0.02 % | −4,818.13 | 3,293.74 | −1,164.85 |
+| `ceps_xborder_ceps_plán_mw` | ČEPS total | 0.62 % | −4,843.60 | 3,115.70 | −1,166.18 |
+
+**Notes**
+- Germany is split across its two bordering control zones (TenneT and 50Hertz); sum them for a total CZ↔DE flow.
+- The `ceps_xborder_ceps_*` columns are the net cross-border balance of the Czech grid and equal the sum of the individual borders. Interpret the sign strictly per the documented convention (positive = export from CZ) rather than against external expectations, since the metered physical-flow balance can differ from the commercial trade balance.
+- `plán` (scheduled) columns have a slightly higher missing share (0.62 %) than `skutečnost` (actual, 0.02 %) because schedules are occasionally not published.
+
+---
+
+## 5. Weather (ERA5 reanalysis)
+
+Spatial mean over the Czech bounding box (48–52°N, 12–19°E; 493 grid points at
+0.25°). All 0.00 % missing.
+
+| Column | Unit | Min | Max | Mean | Description |
+|---|---|---|---|---|---|
+| `era5_u100` | m/s | −8.46 | 15.62 | 1.52 | Eastward wind component at 100 m. |
+| `era5_v100` | m/s | −10.61 | 11.84 | 0.49 | Northward wind component at 100 m. |
+| `era5_wind_speed_100m` | m/s | 0.02 | 15.81 | 4.58 | Derived horizontal wind speed at 100 m: √(u100² + v100²). |
+| `era5_t2m` | K | 260.51 | 307.13 | 283.34 | Air temperature at 2 m (subtract 273.15 for °C: ≈ −12.6 to +34.0 °C). |
+| `era5_ssrd` | J/m² | 0.00 | 3,139,383.50 | 482,593.96 | Surface solar radiation downwards, accumulated over the hour (÷3,600 for W/m²). |
+
+**Notes**
+- 100 m (not 10 m) wind is used because turbine hub heights are ~80–120 m.
+- `ssrd` is an hourly accumulation; divide by 3,600 to obtain average W/m² over the hour (mean ≈ 134 W/m², peak ≈ 872 W/m²).
+- ERA5 timestamps are natively UTC, so no timezone conversion is applied to these columns.
+
+---
+
+## 6. Upstream sources & access
+
+| # | Source | Provider | Access | Native resolution | Feeds panel columns |
+|---|---|---|---|---|---|
+| 1 | Day-ahead prices & volume | **OTE, a.s.** (CZ market operator) | Public daily XLS reports (`ote-cr.cz`) | Hourly | `ote_price_eur_mwh`, `volume_mwh` |
+| 2 | Prices, load, generation, imbalance | **ENTSO-E Transparency Platform** | REST API (free token; `ENTSOE_API_KEY`) | Hourly / 15-min | all `entsoe_*` columns |
+| 3 | Imbalance, cross-border flows, load, generation, RES | **ČEPS, a.s.** (CZ TSO) | Public data portal (`ceps.cz/en/all-data`) | Hourly / 15-min | all `ceps_*` columns |
+| 4 | Weather reanalysis | **Copernicus CDS / ECMWF (ERA5)** | CDS API (free token; `CDS_API_KEY`) | Hourly, 0.25° | all `era5_*` columns |
+
+**ENTSO-E integration status:** fully integrated. The ENTSO-E datasets (Czech and
+German day-ahead prices, actual load, actual generation per production type, and
+imbalance) are downloaded via the REST API and merged into the panel — the 18
+`entsoe_*` columns above are all populated with 0 % missing over 2020–2024. The
+German day-ahead price and the ENTSO-E generation-per-type breakdown come
+exclusively from this source.
+
+**Obtaining the ENTSO-E token:** register at `transparency.entsoe.eu`, then email
+`transparency@entsoe.eu` (subject "Restful API access", body = your registered
+email); after approval, generate the token under *My Account → Web API Security
+Token* and set `ENTSOE_API_KEY` in `.env`.
+
+---
+
+## 7. Processing pipeline (`build_panel.py`)
+
+1. **Load** each raw source with an auto-detecting CSV reader.
+2. **Timezone harmonisation.** OTE and ČEPS timestamps are naive **local** (Europe/Prague); they are localized to Europe/Prague and converted to UTC. DST spring-forward hours (non-existent) and fall-back duplicate hours (ambiguous) are dropped. ENTSO-E and ERA5 timestamps are already timezone-aware/UTC and converted directly. The final index is **naive UTC**.
+3. **Temporal aggregation.** Sources delivered at 15-minute resolution (ČEPS imbalance, cross-border, load, generation; ENTSO-E load/generation where applicable) are aggregated to hourly means.
+4. **Outer join** of all sources on the hourly UTC index, then **sort**.
+5. **Trim** to the common window 2020-01-01 → 2024-12-31 and drop all-NaN rows.
+6. **Reindex** to a continuous hourly index so the panel has no time gaps (43,848 rows); residual per-column gaps remain as missing values (all < 1 %).
+
+**Timezone validation.** After harmonisation, the OTE and ENTSO-E Czech day-ahead
+series line up at lag 0 with near-unit correlation and the solar-driven midday
+price dip aligns across sources — confirming correct local→UTC alignment.
+
+---
+
+## 8. Caveats & known issues
+
+- **Duplicated information is intentional.** Several quantities appear twice by design (OTE vs ENTSO-E CZ price; ČEPS `gen` vs `res` renewables; ENTSO-E vs ČEPS load and generation). This supports cross-validation; pick a single series per quantity before modelling to avoid double counting.
+- **Source discrepancies are expected.** ENTSO-E and ČEPS differ in metering scope, estimation of distributed PV, and load definitions, so their levels do not match exactly. Neither is "corrected" against the other.
+- **Heavy tails.** The imbalance price and, to a lesser extent, the day-ahead prices contain genuine extreme values from crisis/scarcity events. Treat outliers as real unless documented otherwise.
+- **Missing data.** All columns are < 1 % missing. Scheduled (`plán`) cross-border series and the imbalance price carry the largest gaps; prices and weather are essentially complete.
+- **DST handling.** A handful of hours per year are dropped or duplicated at DST transitions before reindexing; this is why raw OTE/ČEPS files have slightly irregular row counts while the merged panel is a clean continuous index.
+- **Units to watch.** Imbalance price is CZK/MWh (not EUR); `t2m` is Kelvin; `ssrd` is J/m² accumulated per hour. Convert as noted before comparing across columns.
+
+---
+
+## Summary
+
+| Group | Columns | Source(s) | Notes |
 |---|---|---|---|
-| `Odhadovaná cena [Kč/MWh]` | CZK/MWh | Estimated imbalance settlement price (positive = shortage, negative = surplus) | −664,968 to +213,623, mean 2,070 |
-
-**Notes:**
-- Extreme outliers (±100,000+ CZK/MWh) correspond to severe grid imbalance events.
-- 15-minute resolution matches Czech imbalance settlement intervals.
-- To convert to EUR/MWh, divide by the EUR/CZK exchange rate (~25 CZK/EUR).
-
----
-
-## 3. ČEPS — Cross-border Physical Flows
-
-| Property | Value |
-|---|---|
-| **File** | `data/ceps/cz_crossborder_flows.csv` |
-| **Source** | ČEPS, a.s. |
-| **URL** | https://www.ceps.cz/en/all-data → `/downloads/graph` |
-| **Download method** | GET request: `method=CrossborderPowerFlows&format=csv&agregation=HR` |
-| **Time span** | 2020-01-01 00:00 → 2025-01-01 00:00 |
-| **Resolution** | 1 hour |
-| **Rows** | 43,844 |
-
-### Columns
-
-Sign convention: **positive = export from CZ**, negative = import to CZ.
-
-| Column | Unit | Counterpart TSO | Description |
-|---|---|---|---|
-| `PSE Skutečnost [MW]` | MW | PSE (Poland) | Actual physical flow CZ ↔ PL |
-| `PSE Plán [MW]` | MW | PSE (Poland) | Planned/scheduled flow CZ ↔ PL |
-| `SEPS Skutečnost [MW]` | MW | SEPS (Slovakia) | Actual physical flow CZ ↔ SK |
-| `SEPS Plán [MW]` | MW | SEPS (Slovakia) | Planned flow CZ ↔ SK |
-| `APG Skutečnost [MW]` | MW | APG (Austria) | Actual physical flow CZ ↔ AT |
-| `APG Plán [MW]` | MW | APG (Austria) | Planned flow CZ ↔ AT |
-| `TenneT Skutečnost [MW]` | MW | TenneT (Germany) | Actual physical flow CZ ↔ DE (TenneT zone) |
-| `TenneT Plán [MW]` | MW | TenneT (Germany) | Planned flow CZ ↔ DE (TenneT) |
-| `50HzT Skutečnost [MW]` | MW | 50Hertz (Germany) | Actual physical flow CZ ↔ DE (50Hertz zone) |
-| `50HzT Plán [MW]` | MW | 50Hertz (Germany) | Planned flow CZ ↔ DE (50Hertz) |
-| `CEPS Skutečnost [MW]` | MW | ČEPS total | Net cross-border balance of Czech grid |
-| `CEPS Plán [MW]` | MW | ČEPS total | Planned net cross-border balance |
-
----
-
-## 4. ČEPS — System Load
-
-| Property | Value |
-|---|---|
-| **File** | `data/ceps/cz_load.csv` |
-| **Source** | ČEPS, a.s. |
-| **Download method** | GET request: `method=Load&format=csv&agregation=HR` |
-| **Time span** | 2020-01-01 00:00 → 2025-01-01 00:00 |
-| **Resolution** | 1 hour |
-| **Rows** | 43,844 |
-
-### Columns
-
-| Column | Unit | Description | Range |
-|---|---|---|---|
-| `Zatížení s čerpáním [MW]` | MW | Total system load **including** pumped-storage consumption | 4,224 to 12,133, mean 8,014 |
-| `Zatížení [MW]` | MW | Net system load **excluding** pumped-storage consumption | 4,224 to 12,133, mean 7,854 |
-
-**Notes:**
-- "Zatížení" = load in Czech.
-- The difference between the two columns reveals pumped-storage hydro activity.
-
----
-
-## 5. ČEPS — Generation Mix
-
-| Property | Value |
-|---|---|
-| **File** | `data/ceps/cz_generation_mix.csv` |
-| **Source** | ČEPS, a.s. |
-| **Download method** | GET request: `method=Generation&format=csv&agregation=HR` (yearly chunks due to server limit) |
-| **Time span** | 2020-01-01 00:00 → 2025-01-01 00:00 |
-| **Resolution** | 1 hour |
-| **Rows** | 43,844 |
-
-### Columns
-
-| Column | Unit | Description | Range |
-|---|---|---|---|
-| `PE [MW]` | MW | Thermal power plants (coal, gas, oil) | 734 to 7,165, mean 4,009 |
-| `PPE [MW]` | MW | Industrial co-generation (heat & power) | 0 to 1,453, mean 459 |
-| `JE [MW]` | MW | Nuclear power plants (Dukovany + Temelín) | 1,171 to 4,221, mean 3,462 |
-| `VE [MW]` | MW | Run-of-river hydro | −20 to 800, mean 225 |
-| `PVE [MW]` | MW | Pumped-storage hydro (positive = generating, negative = pumping) | −52 to 1,068, mean 129 |
-| `AE [MW]` | MW | Other / auxiliary generation | 156 to 386, mean 242 |
-| `ZE [MW]` | MW | Storage / other (currently zero in data) | 0 |
-| `VTE [MW]` | MW | Wind turbines | 0 to 295, mean 74 |
-| `FVE [MW]` | MW | Photovoltaic (solar) | 0 to 3,182, mean 308 |
-
-**Notes:**
-- Czech abbreviations: PE = parní elektrárna (thermal), JE = jaderná elektrárna (nuclear), VE = vodní elektrárna (hydro), PVE = přečerpávací vodní elektrárna (pumped-storage), VTE = větrná turbína (wind), FVE = fotovoltaická elektrárna (solar).
-- Nuclear (JE) is the largest and most stable source, running near 4,000 MW baseload.
-
----
-
-## 6. ČEPS — Renewable Generation
-
-| Property | Value |
-|---|---|
-| **File** | `data/ceps/cz_renewable_generation.csv` |
-| **Source** | ČEPS, a.s. |
-| **Download method** | GET request: `method=GenerationRES&format=csv&agregation=HR` |
-| **Time span** | 2020-01-01 00:00 → 2025-01-01 00:00 |
-| **Resolution** | 1 hour |
-| **Rows** | 43,844 |
-
-### Columns
-
-| Column | Unit | Description | Range |
-|---|---|---|---|
-| `VTE [MW]` | MW | Wind power generation (all Czech turbines) | 0 to 295, mean 74 |
-| `FVE [MW]` | MW | Solar PV generation (all Czech panels) | 0 to 3,182, mean 308 |
-
-**Notes:**
-- These are the same values as in `cz_generation_mix.csv` but provided as a standalone dataset.
-- Czech installed capacity is small for wind (~335 MW) but larger for solar (~3,500 MW).
-- Solar output naturally follows daily and seasonal cycles (zero at night).
-
----
-
-## 7. ERA5 — Weather Reanalysis
-
-| Property | Value |
-|---|---|
-| **Files** | `data/era5/era5_cz_{YYYY}_{MM}.nc` (one ZIP archive per month, 60 total) |
-| **Source** | Copernicus Climate Data Store (CDS), ECMWF |
-| **Dataset** | `reanalysis-era5-single-levels` |
-| **URL** | https://cds.climate.copernicus.eu |
-| **Access** | Free account required; Personal Access Token in `.env` as `CDS_API_KEY` |
-| **Time span** | 2020-01-01 00:00 UTC → 2024-12-31 23:00 UTC |
-| **Resolution** | 1 hour (temporal), 0.25° × 0.25° (spatial) |
-| **Spatial extent** | 48°N – 52°N, 12°E – 19°E (bounding box covering Czech Republic) |
-| **Grid** | 17 latitude × 29 longitude = 493 grid points |
-| **Format** | ZIP archive containing two NetCDF4 files per month |
-
-### Inner files (per monthly ZIP)
-
-| Inner file | Variables | Step type |
-|---|---|---|
-| `data_stream-oper_stepType-instant.nc` | u100, v100, t2m | Instantaneous (valid at each hour) |
-| `data_stream-oper_stepType-accum.nc` | ssrd | Accumulated (sum over the preceding hour) |
-
-### Variables
-
-| Variable | Unit | Description | Approx. range (CZ) |
-|---|---|---|---|
-| `u100` | m/s | U-component (eastward) of wind at 100 m above ground | −15 to +15 m/s |
-| `v100` | m/s | V-component (northward) of wind at 100 m above ground | −15 to +15 m/s |
-| `t2m` | K (Kelvin) | Air temperature at 2 m above ground. Subtract 273.15 for °C | ~260–310 K (−13 to +37 °C) |
-| `ssrd` | J/m² | Surface solar radiation downwards, accumulated over 1 hour. Divide by 3600 for W/m² | 0 to ~1,400,000 J/m² (i.e. 0–389 W/m²) |
-| `wind_speed_100m` *(derived)* | m/s | Horizontal wind speed at 100 m: √(u100² + v100²). Added during CSV conversion | 0 to ~22 m/s |
-
-### Derived CSV files
-
-After running `era5_nc_to_csv()`, one CSV per year is created:
-
-| File | Description |
-|---|---|
-| `data/era5/era5_cz_{YYYY}.csv` | Spatial mean over all 493 CZ grid points, all 4 variables + `wind_speed_100m` |
-
-**Notes:**
-- 100 m wind components are used (not 10 m) because wind turbines operate at hub height (~80–120 m).
-- `ssrd` is a forecast accumulated from the analysis time; divide by 3,600 to convert J/m² → W/m² (average power over the hour).
-- ERA5 timestamps are in **UTC**; CET = UTC+1, CEST = UTC+2.
-- The spatial mean over 493 grid points gives a representative national average.
-
----
-
-## 8. ENTSO-E — Transparency Platform *(pending API key)*
-
-| Property | Value |
-|---|---|
-| **Files** | `data/entsoe/` (not yet downloaded) |
-| **Source** | ENTSO-E Transparency Platform |
-| **URL** | https://transparency.entsoe.eu |
-| **Access** | Free account required; Web API Security Token in `.env` as `ENTSOE_API_KEY` |
-
-### Planned datasets
-
-| File | Description | Unit |
-|---|---|---|
-| `cz_da_prices_entsoe.csv` | Day-ahead prices — cross-check against OTE | EUR/MWh |
-| `cz_load_entsoe.csv` | Actual total load | MW |
-| `cz_gen_per_type_entsoe.csv` | Actual generation per production type | MW |
-| `cz_net_transfer_capacity.csv` | Net Transfer Capacities on CZ borders | MW |
-| `cz_scheduled_exchanges.csv` | Scheduled commercial exchanges | MW |
-
-**How to enable:**
-1. Register at https://transparency.entsoe.eu (free)
-2. Email transparency@entsoe.eu: subject `Restful API access`, body = your registered email
-3. After approval (~3 working days): My Account Settings → Web API Security Token → Generate
-4. Add to `.env`:  `ENTSOE_API_KEY=your_token_here`
-5. Re-run `collect_data.py` — ENTSO-E data will be downloaded automatically
-
----
-
-## Summary Table
-
-| # | File | Source | Resolution | Rows | Period | Key use |
-|---|---|---|---|---|---|---|
-| 1 | `ote/cz_dam_ote.csv` | OTE | Hourly | 43,843 | 2020–2024 | DAM price signal for arbitrage |
-| 2 | `ceps/cz_imbalance_price.csv` | ČEPS | 15-min | 57,059 | 2020–2024 | Balancing market revenue |
-| 3 | `ceps/cz_crossborder_flows.csv` | ČEPS | Hourly | 43,844 | 2020–2024 | Grid congestion indicators |
-| 4 | `ceps/cz_load.csv` | ČEPS | Hourly | 43,844 | 2020–2024 | Demand feature for price forecasting |
-| 5 | `ceps/cz_generation_mix.csv` | ČEPS | Hourly | 43,844 | 2020–2024 | Supply composition features |
-| 6 | `ceps/cz_renewable_generation.csv` | ČEPS | Hourly | 43,844 | 2020–2024 | RES variability features |
-| 7 | `era5/era5_cz_*.nc` | Copernicus/ECMWF | Hourly, 0.25° | 60 files | 2020–2024 | Weather inputs for RES forecasting |
-| 8 | `entsoe/` *(pending)* | ENTSO-E | Hourly | — | 2020–2024 | Cross-validation & additional features |
-
----
-
-*Generated: 2026-07-02 | collect_data.py*
+| Prices | 5 | OTE, ENTSO-E, ČEPS | CZ/DE day-ahead + volume + imbalance |
+| Load | 3 | ENTSO-E, ČEPS | actual load + ČEPS load with/without pumping |
+| Generation (ENTSO-E) | 15 | ENTSO-E | per production type |
+| Generation (ČEPS) | 9 | ČEPS | technology mix (Czech labels) |
+| Renewables (ČEPS) | 2 | ČEPS | wind & solar standalone feed |
+| Cross-border flows | 12 | ČEPS | 5 borders + total, actual & planned |
+| Weather | 5 | ERA5 | 100 m wind, 2 m temperature, solar radiation |
+| **Total** | **51** | | 43,848 hourly rows, UTC, 2020–2024 |

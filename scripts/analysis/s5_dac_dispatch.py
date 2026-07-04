@@ -1,5 +1,5 @@
 """
-s5_dac_dispatch.py — operational model of flexible DAC dispatch (thesis §4.2).
+s5_dac_dispatch.py — operational model of flexible DAC dispatch (draft §4.2).
 
 Policies evaluated on the simulated price paths from s4:
 
