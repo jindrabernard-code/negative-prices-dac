@@ -1,10 +1,8 @@
 # Battery Storage Arbitrage — Data Collection & Panel
 
-*Stochastic Optimization of Battery Storage Arbitrage on the Czech Electricity Market*
-
 ## Contents
 
-| File / Folder | Description |
+| File | Description |
 |---|---|
 | `collect_data.py` | Data collection script (ENTSO-E, OTE, ČEPS, ERA5) |
 | `build_panel.py` | Merges all sources into a single hourly panel CSV |
@@ -17,7 +15,7 @@
 | `data/topic1_panel.csv` | **Merged hourly panel — 43,848 rows × 51 columns** |
 | `data/DATA_LEGEND.md` | Full documentation of all variables, units, sources |
 
-## Quick Start
+## Replication of data collection
 
 ```bash
 pip install -r requirements.txt
